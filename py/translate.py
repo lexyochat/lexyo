@@ -72,6 +72,25 @@ TRANSLATION_CACHE: Dict[str, Dict] = {}
 _write_counter = 0
 URL_REGEX = re.compile(r"https?://\S+", re.IGNORECASE)
 
+_QUOTE_EXTRACT_REGEX = re.compile(r"'([^']+)'|\"([^\"]+)\"")
+
+
+def _extract_translation_only(text: str) -> str:
+    """
+    Best-effort cleanup when the model returns an explanation instead of only the translation.
+    Example: "'Hello world' in French is 'Bonjour le monde'."
+    We try to return the last quoted segment.
+    """
+    if not text:
+        return text
+    s = str(text).strip()
+    matches = _QUOTE_EXTRACT_REGEX.findall(s)
+    if matches:
+        last = matches[-1]
+        candidate = last[0] or last[1]
+        return candidate.strip() if candidate else s
+    return s
+
 
 # =========================================
 #   HELPERS
@@ -179,10 +198,7 @@ _load_cache()
 #   LRU HELPERS (S5-B)
 # =========================================
 def _build_prompt_single(text: str, src: str, tgt: str) -> str:
-    return (
-        f"Translate this message from {src} to {tgt}.\n"
-        f"Respond ONLY with the translated text, nothing else:\n\n{text}"
-    )
+    return f"Translate this message from {src} to {tgt}:\n{text}"
 
 
 @lru_cache(maxsize=LRU_MAXSIZE)
@@ -200,10 +216,14 @@ def _translate_via_openai_lru(text: str, src: str, tgt: str) -> str:
     try:
         resp = client.chat.completions.create(
             model=MODEL_NAME,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": "You are a translation engine. Output ONLY the translated text. No quotes. No explanations."},
+                {"role": "user", "content": prompt},
+            ],
             temperature=0.0,
         )
-        translated = (resp.choices[0].message.content or "").strip() or text
+        translated_raw = (resp.choices[0].message.content or "").strip()
+        translated = _extract_translation_only(translated_raw) or text
         log_info("translate", f"Translated: '{text[:30]}' → '{translated[:30]}'")
         return translated
     except Exception:
@@ -269,25 +289,38 @@ def translate_batch(texts: List[str], src: str, tgt: str) -> List[str]:
 
     prompt = (
         f"Translate ALL the following texts from {src} to {tgt}.\n"
-        f"Return ONLY a JSON list of translated strings.\n\n"
+        f"Return ONLY a JSON array (list) of translated strings. No markdown, no explanations.\n\n"
         f"{json.dumps(to_translate, ensure_ascii=False)}"
     )
 
     try:
         resp = client.chat.completions.create(
             model=MODEL_NAME,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": "You are a translation engine. Output ONLY valid JSON array of strings. No markdown. No explanations."},
+                {"role": "user", "content": prompt},
+            ],
             temperature=0.0,
         )
 
         raw = (resp.choices[0].message.content or "").strip()
-        batch = json.loads(raw)
+
+        # Try strict JSON first, then attempt to extract the first JSON array if the model wrapped it.
+        try:
+            batch = json.loads(raw)
+        except Exception:
+            start = raw.find("[")
+            end = raw.rfind("]")
+            if start != -1 and end != -1 and end > start:
+                batch = json.loads(raw[start:end + 1])
+            else:
+                raise
 
         if not isinstance(batch, list) or len(batch) != len(to_translate):
             raise ValueError("Invalid batch response")
 
         for idx, original, translated in zip(to_indices, to_translate, batch):
-            translated = translated or original
+            translated = _extract_translation_only(str(translated or "")) or original
             results[idx] = translated
             _add_to_cache(_make_key(original, src, tgt), translated)
 
