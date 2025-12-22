@@ -2,6 +2,7 @@
 #     Lexyo — Main Application (CLEAN PROD 2026)
 #     + Render Ready (eventlet)
 #     + Cloudflare Turnstile Invisible Support
+#     PATCH 03: Persistent storage bootstrap
 # ============================================
 
 import eventlet
@@ -16,7 +17,14 @@ from flask_socketio import SocketIO
 from dotenv import load_dotenv
 load_dotenv()
 
-from py.config import DATA_DIR, TURNSTILE_SITE_KEY
+from py.config import (
+    DATA_DIR,
+    PUBLIC_DIR,
+    PRIVATE_DIR,
+    CACHE_DIR,
+    LOGS_DIR,
+    TURNSTILE_SITE_KEY,
+)
 from py.storage import load_channels
 from py.cleanup import start_cleanup_task
 from py.sockets_public import register_public_handlers
@@ -56,7 +64,6 @@ def verify_turnstile(token: str) -> bool:
             timeout=5,
         )
 
-        # Robust parsing
         try:
             data = r.json()
         except Exception:
@@ -65,7 +72,6 @@ def verify_turnstile(token: str) -> bool:
 
         ok = data.get("success") is True
         if not ok:
-            # Keep it short but useful; do not log secrets/tokens
             codes = data.get("error-codes")
             log_info("turnstile", f"Verification failed. error-codes={codes}")
         return ok
@@ -85,18 +91,18 @@ socketio = SocketIO(
     cors_allowed_origins="*"
 )
 
-# Expose helpers for other modules (sockets handlers, etc.)
-# This avoids circular imports and keeps a single source of truth.
+# Expose helpers for other modules
 app.config["VERIFY_TURNSTILE"] = verify_turnstile
 
 # =========================================
-#   ENSURE DATA DIR EXISTS
+#   ENSURE PERSISTENT STORAGE STRUCTURE EXISTS
 # =========================================
 try:
-    os.makedirs(DATA_DIR, exist_ok=True)
-    log_info("app", f"DATA_DIR verified/created at: {DATA_DIR}")
+    for path in (DATA_DIR, PUBLIC_DIR, PRIVATE_DIR, CACHE_DIR, LOGS_DIR):
+        os.makedirs(path, exist_ok=True)
+    log_info("app", f"Persistent storage ready at: {DATA_DIR}")
 except Exception as e:
-    log_error("app", f"Error creating DATA_DIR: {e}")
+    log_error("app", f"Error initializing persistent storage: {e}")
 
 # =========================================
 #   LOAD CHANNELS AT STARTUP
