@@ -148,6 +148,7 @@ def send_room_history(room, sid):
                 {
                     "type": "text",
                     "pseudo": msg.get("pseudo", ""),
+                    "text": translated or original,
                     "original": original,
                     "translated": translated,
                     "source_lang": msg.get("source_lang"),
