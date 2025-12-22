@@ -1,77 +1,35 @@
 // =====================================================
-//   TURNSTILE.JS — Lexyo Clean Module (PROD)
+//   TURNSTILE.JS — Lexyo Clean Module
 //   Cloudflare Turnstile (Invisible)
-//   One-shot token, socket-safe
+//   NO side effects — safe ES module
 // =====================================================
 
-let widgetId = null;
-let pendingResolvers = [];
-let timeoutHandle = null;
+let resolvers = [];
+let timer = null;
 
-/**
- * Internal success callback called by Cloudflare
- */
 window.onTurnstileSuccess = function (token) {
-    if (!token) return;
+  if (!token) return;
 
-    const resolvers = [...pendingResolvers];
-    pendingResolvers = [];
+  resolvers.forEach(r => r(token));
+  resolvers = [];
 
-    resolvers.forEach(resolve => resolve(token));
-
-    if (timeoutHandle) {
-        clearTimeout(timeoutHandle);
-        timeoutHandle = null;
-    }
+  if (timer) {
+    clearTimeout(timer);
+    timer = null;
+  }
 };
 
-/**
- * Ensure Turnstile widget exists and is executed
- */
-function ensureTurnstile() {
-    if (widgetId === null) {
-        widgetId = turnstile.render("#turnstile", {
-            sitekey: TURNSTILE_SITE_KEY,
-            callback: window.onTurnstileSuccess,
-            "error-callback": resetTurnstile,
-            "expired-callback": resetTurnstile
-        });
-    }
-
-    turnstile.reset(widgetId);
-    turnstile.execute(widgetId);
-}
-
-/**
- * Reset internal state and force a fresh token
- */
-function resetTurnstile() {
-    pendingResolvers = [];
-
-    if (timeoutHandle) {
-        clearTimeout(timeoutHandle);
-        timeoutHandle = null;
-    }
-
-    if (widgetId !== null) {
-        turnstile.reset(widgetId);
-    }
-}
-
-/**
- * Public API
- * Returns a Promise that resolves with a FRESH Turnstile token
- */
 export function runTurnstile() {
-    return new Promise((resolve, reject) => {
-        pendingResolvers.push(resolve);
+  return new Promise((resolve, reject) => {
+    timer = setTimeout(() => {
+      resolvers = [];
+      reject("turnstile_timeout");
+    }, 8000);
 
-        timeoutHandle = setTimeout(() => {
-            pendingResolvers = [];
-            timeoutHandle = null;
-            reject("turnstile_timeout");
-        }, 8000);
-
-        ensureTurnstile();
+    resolvers.push(token => {
+      clearTimeout(timer);
+      timer = null;
+      resolve(token);
     });
+  });
 }
