@@ -1,6 +1,7 @@
-# ============================================
+# =========================================
 #     Lexyo — Translation Engine (CLEAN PROD + Logging)
-# ============================================
+#     PATCH 02: Persistent cache via DATA_DIR/_cache
+# =========================================
 
 import os
 import re
@@ -11,7 +12,9 @@ from functools import lru_cache
 
 from dotenv import load_dotenv
 from openai import OpenAI
+
 from py.logger import log_info, log_warning, log_error, log_exception
+from py.config import CACHE_DIR, TRANSLATIONS_CACHE_FILE
 
 # =========================================
 #   OPENAI CONFIG (SAFE / LAZY)
@@ -22,7 +25,6 @@ _openai_disabled = False
 MODEL_NAME = "gpt-4o-mini"
 
 # LRU in-memory cache (S5-B)
-# This complements the disk cache (translations.json).
 LRU_MAXSIZE = 5000
 
 
@@ -56,16 +58,14 @@ def _get_openai_client():
 
 
 # =========================================
-#   CACHE CONFIG
+#   CACHE CONFIG (PERSISTENT)
 # =========================================
-CACHE_DIR = "cache"
-CACHE_FILE = os.path.join(CACHE_DIR, "translations.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
+CACHE_FILE = TRANSLATIONS_CACHE_FILE
 
 MAX_CACHE_SIZE = 50000
 TRIM_TARGET_RATIO = 0.9
 SAVE_EVERY_N_WRITES = 50
-
-os.makedirs(CACHE_DIR, exist_ok=True)
 
 TRANSLATION_CACHE: Dict[str, Dict] = {}
 _write_counter = 0
@@ -220,9 +220,7 @@ def translate_text(text: str, src: str, tgt: str) -> str:
         _touch_entry(key, entry)
         return entry.get("translated", text)
 
-    # Miss on persistent cache: use in-memory LRU (S5-B)
     translated = _translate_via_openai_lru(text, src, tgt)
-
     _add_to_cache(key, translated)
     return translated
 
@@ -246,7 +244,6 @@ def translate_batch(texts: List[str], src: str, tgt: str) -> List[str]:
     to_translate = []
     to_indices = []
 
-    # 1) Check cache + skip URLs
     for i, txt in enumerate(texts):
         if not txt or contains_url(txt):
             results[i] = txt

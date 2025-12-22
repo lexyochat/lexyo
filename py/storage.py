@@ -10,6 +10,7 @@ import json
 import time
 import threading
 import base64
+import tempfile
 
 from cryptography.fernet import Fernet
 
@@ -24,6 +25,39 @@ from py.logger import log_info, log_warning, log_error, log_exception
 # Ensure directories exist
 os.makedirs(PUBLIC_DIR, exist_ok=True)
 os.makedirs(PRIVATE_DIR, exist_ok=True)
+
+
+# =====================================================
+#   ATOMIC JSON WRITE (ROBUST PERSISTENCE)
+# =====================================================
+
+def _atomic_write_json(path: str, payload):
+    """
+    Atomic JSON write:
+    - write to temp file in the same directory
+    - flush + fsync
+    - atomic replace using os.replace()
+
+    This prevents corrupted/truncated JSON files if the process
+    restarts/crashes while writing (common in PaaS environments).
+    """
+    directory = os.path.dirname(path) or "."
+    os.makedirs(directory, exist_ok=True)
+
+    fd, tmp_path = tempfile.mkstemp(prefix=".tmp_", suffix=".json", dir=directory)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, path)
+    finally:
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except Exception:
+            # best-effort cleanup only
+            pass
 
 
 # =====================================================
@@ -199,9 +233,7 @@ def save_channels():
         serializable_meta[r] = meta
 
     try:
-        with open(CHANNELS_FILE, "w", encoding="utf-8") as f:
-            json.dump(serializable_meta, f, indent=2, ensure_ascii=False)
-
+        _atomic_write_json(CHANNELS_FILE, serializable_meta)
         log_info("storage", f"Saved {len(serializable_meta)} channels.")
     except Exception:
         log_exception("storage", "Failed writing channels.json")
@@ -245,8 +277,7 @@ def save_room_messages(room, msgs):
     path = get_room_path(room)
 
     try:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(msgs, f, indent=2, ensure_ascii=False)
+        _atomic_write_json(path, msgs)
     except Exception:
         log_exception("storage", f"Error writing room file: {room}")
 

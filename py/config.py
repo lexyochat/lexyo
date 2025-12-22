@@ -10,21 +10,59 @@ import os
 # =========================================
 # Expected values: "dev", "prod"
 ENV = os.getenv("ENV", "dev").lower()
-
 IS_PROD = ENV == "prod"
+
+# =========================================
+#   RENDER / PERSISTENT DISK
+# =========================================
+# On Render, attach a disk mounted for example at:
+#   /var/data
+#
+# We make DATA_DIR resolve to the disk when available,
+# so conversations/files survive restarts & deploys.
+#
+# Priority:
+#  1) DATA_DIR env (absolute or relative)
+#  2) RENDER_DISK_MOUNT env (absolute)
+#  3) If /var/data exists -> use it
+#  4) fallback to ./data (local)
+
+def _resolve_data_dir() -> str:
+    env_data_dir = os.getenv("DATA_DIR", "").strip()
+    if env_data_dir:
+        if os.path.isabs(env_data_dir):
+            return env_data_dir
+        return os.path.abspath(env_data_dir)
+
+    env_mount = os.getenv("RENDER_DISK_MOUNT", "").strip()
+    if env_mount and os.path.isabs(env_mount):
+        return env_mount
+
+    if os.path.isdir("/var/data"):
+        return "/var/data"
+
+    return os.path.abspath("data")
+
+
+DATA_DIR = _resolve_data_dir()
 
 # =========================================
 #   STORAGE DIRECTORIES
 # =========================================
-DATA_DIR = "data"
-
-CHANNELS_FILE = "channels.json"
+CHANNELS_FILE = os.path.join(DATA_DIR, "channels.json")
 PUBLIC_DIR = os.path.join(DATA_DIR, "public")
 PRIVATE_DIR = os.path.join(DATA_DIR, "private")
+
+CACHE_DIR = os.path.join(DATA_DIR, "_cache")
+TRANSLATIONS_CACHE_FILE = os.path.join(CACHE_DIR, "translations.json")
+
+LOGS_DIR = os.path.join(DATA_DIR, "_logs")
 
 # Ensure folders exist at startup
 os.makedirs(PUBLIC_DIR, exist_ok=True)
 os.makedirs(PRIVATE_DIR, exist_ok=True)
+os.makedirs(CACHE_DIR, exist_ok=True)
+os.makedirs(LOGS_DIR, exist_ok=True)
 
 # =========================================
 #   GENERAL PARAMETERS
