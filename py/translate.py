@@ -1,6 +1,6 @@
 # =========================================
 #     Lexyo — Translation Engine (CLEAN PROD + Logging)
-#     PATCH 02: Persistent cache via DATA_DIR/_cache
+#     PATCH 10: Immediate persistent cache write
 # =========================================
 
 import os
@@ -65,7 +65,7 @@ CACHE_FILE = TRANSLATIONS_CACHE_FILE
 
 MAX_CACHE_SIZE = 50000
 TRIM_TARGET_RATIO = 0.9
-SAVE_EVERY_N_WRITES = 50
+SAVE_EVERY_N_WRITES = 50  # kept for compatibility / future tuning
 
 TRANSLATION_CACHE: Dict[str, Dict] = {}
 _write_counter = 0
@@ -148,6 +148,10 @@ def _ensure_cache_limit():
 
 
 def _add_to_cache(key: str, translated: str):
+    """
+    Add entry to cache AND persist immediately.
+    This guarantees translation survives refresh / restart.
+    """
     global _write_counter
 
     now = time.time()
@@ -161,10 +165,13 @@ def _add_to_cache(key: str, translated: str):
 
     _write_counter += 1
     _ensure_cache_limit()
-    _save_cache()
+
+    # 🔴 CRITICAL FIX:
+    # Persist immediately so cache is not lost between messages
+    _save_cache(force=True)
 
 
-# Load on startup
+# Load cache on startup
 _load_cache()
 
 
@@ -181,8 +188,8 @@ def _build_prompt_single(text: str, src: str, tgt: str) -> str:
 @lru_cache(maxsize=LRU_MAXSIZE)
 def _translate_via_openai_lru(text: str, src: str, tgt: str) -> str:
     """
-    S5-B: in-memory LRU cache for OpenAI translations.
-    This does NOT replace the persistent disk cache; it complements it.
+    In-memory LRU cache for OpenAI translations.
+    Complements the persistent disk cache.
     """
     client = _get_openai_client()
     if not client:
@@ -294,5 +301,4 @@ def translate_batch(texts: List[str], src: str, tgt: str) -> List[str]:
         for idx, original in zip(to_indices, to_translate):
             results[idx] = translate_text(original, src, tgt)
 
-    _save_cache(force=True)
     return [r if r is not None else texts[i] for i, r in enumerate(results)]
