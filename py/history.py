@@ -68,10 +68,12 @@ def send_room_history(room, sid):
             if msg_type in ("action", "code"):
                 continue
 
-            # Ancien format: pas de "type", on considère "text"
-            src_lang = msg.get("source_lang", target_lang)
-            original = msg.get("original", "")
+            src_lang = msg.get("source_lang")
+            if not src_lang:
+                # Force translation when source language is unknown
+                src_lang = "__unknown__"
 
+            original = msg.get("original", "")
             grouped.setdefault(src_lang, []).append((idx, original))
 
         # ----------------------------------------------------
@@ -148,7 +150,7 @@ def send_room_history(room, sid):
                     "pseudo": msg.get("pseudo", ""),
                     "original": original,
                     "translated": translated,
-                    "source_lang": msg.get("source_lang", target_lang),
+                    "source_lang": msg.get("source_lang"),
                     "target_lang": target_lang,
                     "timestamp": msg.get("timestamp"),
                     "color": msg.get("color"),
