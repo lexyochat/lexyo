@@ -32,15 +32,6 @@ os.makedirs(PRIVATE_DIR, exist_ok=True)
 # =====================================================
 
 def _atomic_write_json(path: str, payload):
-    """
-    Atomic JSON write:
-    - write to temp file in the same directory
-    - flush + fsync
-    - atomic replace using os.replace()
-
-    This prevents corrupted/truncated JSON files if the process
-    restarts/crashes while writing (common in PaaS environments).
-    """
     directory = os.path.dirname(path) or "."
     os.makedirs(directory, exist_ok=True)
 
@@ -56,7 +47,6 @@ def _atomic_write_json(path: str, payload):
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
         except Exception:
-            # best-effort cleanup only
             pass
 
 
@@ -89,10 +79,6 @@ def decrypt_mp(token: str) -> str:
 # =====================================================
 
 def normalize_message(msg: dict) -> dict:
-    """
-    Normalize message structure before persistence.
-    Guarantees a stable backend ↔ frontend contract.
-    """
     m = dict(msg or {})
 
     m.setdefault("type", "text")
@@ -104,6 +90,7 @@ def normalize_message(msg: dict) -> dict:
         m.setdefault("original", m.get("text"))
         m.setdefault("translated", None)
         m.setdefault("lang", None)
+        m.setdefault("source_lang", m.get("lang"))
 
     elif m["type"] in ("action", "code"):
         m.setdefault("content", "")
@@ -156,8 +143,6 @@ def load_channels():
         now = time.time()
 
         for r, meta in data.items():
-
-            # skip private rooms
             if isinstance(r, str) and r.startswith("@"):
                 log_warning("storage", f"Ignoring private room in channels.json: {r}")
                 continue
@@ -185,7 +170,6 @@ def load_channels():
         state.rooms_meta.clear()
         state.rooms.clear()
 
-    # Inject officials
     now = time.time()
     for r in OFFICIAL_ROOMS:
         if r not in state.rooms_meta:
@@ -208,7 +192,6 @@ def load_channels():
 def save_channels():
     now = time.time()
 
-    # ensure official exist
     for r in OFFICIAL_ROOMS:
         if r not in state.rooms_meta:
             state.rooms_meta[r] = {
@@ -220,7 +203,6 @@ def save_channels():
         if r not in state.rooms:
             state.rooms.append(r)
 
-    # strip private rooms
     state.rooms[:] = [
         r for r in state.rooms
         if not (isinstance(r, str) and r.startswith("@"))
@@ -283,13 +265,7 @@ def save_room_messages(room, msgs):
 
 
 def append_message(room, msg):
-    """
-    Append any message type (text, action, code)
-    and ensure HISTORY_LIMIT is respected.
-    MP rooms are encrypted server-side.
-    """
     msgs = load_room_messages(room)
-
     msg = normalize_message(msg)
 
     if isinstance(room, str) and room.startswith("@"):
