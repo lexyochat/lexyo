@@ -1,0 +1,31 @@
+# ============================================
+# Lexyo — Requirements (CLEAN PROD 2026)
+# ============================================
+
+# Flask core
+flask==3.0.0
+jinja2==3.1.3
+itsdangerous==2.1.2
+werkzeug==3.0.1
+
+# Socket.IO (Server + Python client for MP tabs sync)
+flask-socketio==5.3.6
+python-socketio==5.11.1
+
+# Async worker (best for Render + Flask-SocketIO)
+eventlet==0.33.3
+
+# Environment variables (.env)
+python-dotenv==1.0.1
+
+# HTTP utils (Turnstile check + misc)
+requests==2.31.0
+
+# OpenAI - New API (v1.x)
+openai==1.43.0
+
+# Optional: Faster JSON (safe + tiny)
+orjson==3.9.15
+
+# Security (for future features)
+cryptography>=41.0.0

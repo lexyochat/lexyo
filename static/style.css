@@ -1,0 +1,660 @@
+/* =========================================================
+   Lexyo — Style PRO (VS Code Dark+ Edition)
+   Structure simple : side-left / chat-center / side-right
+   ========================================================= */
+
+/* ===================== VARIABLES ===================== */
+
+:root {
+  --bg: #1e1e1e;
+  --bg-alt: #252526;
+  --bg-item: #2d2d2d;
+  --bg-input: #333;
+  --text: #d4d4d4;
+  --text-muted: #8c8c8c;
+  --accent: #007acc;
+  --accent-text: #ffffff;
+  --border: #3c3c3c;
+  --radius: 6px;
+  --space: 10px;
+
+  --font-main: 14px;
+  --font-main-size: var(--font-main); /* ← ICI */
+  --font-small: 12px;
+}
+
+/* ===================== RESET ===================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: Consolas, monospace;
+  font-size: var(--font-main);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===================== LOGIN SCREEN ===================== */
+
+#login {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+#login h1 {
+  font-size: 3rem;
+  margin-bottom: 30px;
+}
+
+.login-box {
+  display: flex;
+  gap: var(--space);
+}
+
+/* Inputs login harmonisés */
+#login input,
+#login select,
+#login button {
+  height: 36px;
+  padding: 0 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: var(--font-main);
+}
+
+/* Select langue compact */
+#login select#lang {
+  width: 65px;
+  text-align: center;
+  cursor: pointer;
+}
+
+/* Bouton Join */
+#login button#enter {
+  padding: 0 24px;
+  background: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--accent-text);
+  font-weight: bold;
+  cursor: pointer;
+}
+
+#login button#enter:hover {
+  filter: brightness(1.15);
+}
+
+.glow .dot {
+  color: var(--accent);
+}
+
+.error {
+  color: crimson;
+  margin-top: 10px;
+}
+
+.tagline {
+  margin-top: -30px;
+  margin-bottom: 25px;
+  text-align: center;
+  font-size: 17px;
+  opacity: 0.55;
+  color: var(--text);
+  font-style: italic;
+  opacity: 0;
+  animation: fadeIn 2s ease forwards;
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 0.5;
+  }
+}
+
+/* ===================== FOOTER DONATE ===================== */
+
+.footer-donate {
+  position: fixed;
+  bottom: 14px;
+  width: 100%;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.4;
+  opacity: 0.8;
+  color: #a0a0a0;
+}
+
+/* ligne 1 - dominante */
+.footer-donate .line1 {
+  color: #c8c8c8;
+  font-weight: 500;
+}
+
+/* ligne 2 - poétique, mais plus douce que ton bleu actuel */
+.footer-donate .line2 {
+  color: #7ab4ff; /* bleu plus soft */
+  opacity: 0.85;
+}
+
+/* ligne 3 - discrète & technique */
+.footer-donate .line3 {
+  color: #8f8f8f;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;    /* légèrement mais subtilement plus petit */
+  opacity: 0.75;
+}
+
+/* ===================== APP WRAPPER ===================== */
+
+.app {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ===================== LAYOUT ===================== */
+
+.app-layout {
+  flex: 1;
+  display: flex;
+  gap: var(--space);
+  padding: var(--space);
+  min-height: 0;
+}
+
+/* ===================== TOP BRAND ===================== */
+
+.brand-box {
+  margin-bottom: 14px;
+  padding-left: 4px;
+}
+
+.brand-title {
+  font-size: 22px;
+  font-weight: bold;
+  color: var(--text);
+}
+
+.brand-title .dot {
+  color: var(--accent);
+}
+
+.brand-link {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  display: block;
+}
+
+/* ===================== SIDEBARS ===================== */
+
+.side-left,
+.side-right {
+  width: 260px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space);
+  display: flex;
+  flex-direction: column;
+}
+
+.side-left .section-title{
+    margin-top: 2px;
+}
+.side-right .section-title {
+    margin-top: 40px;
+}
+
+.side-left .list-block,
+.side-right .list-block {
+    margin-top: 6px;
+}
+
+.section-title {
+  margin-bottom: var(--space);
+  font-weight: bold;
+}
+
+/* Shared list block */
+.list-block {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  padding: var(--space) 6px;
+  border-radius: var(--radius);
+}
+
+/* ===================== CHANNEL ITEMS ===================== */
+
+.channel-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-item);
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+
+.channel-item:hover {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.chan-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.chan-count {
+  color: var(--text-muted);
+}
+
+/* ===================== CREATE ROOM ===================== */
+
+.create-room {
+  display: flex;
+  gap: 6px;
+  margin-top: var(--space);
+}
+
+#new-room-name {
+  flex: 1;
+  height: 36px;
+  padding: 0 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+}
+
+#create-room-btn {
+  height: 36px;
+  padding: 0 14px;
+  background: var(--accent);
+  color: var(--accent-text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#create-room-btn:hover {
+  filter: brightness(1.15);
+}
+
+/* ===================== CHAT CENTER ===================== */
+
+.chat-center {
+  flex: 1;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: var(--space);
+  flex-wrap: wrap;
+}
+
+.tab {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  background: var(--bg-item);
+  border-radius: var(--radius);
+  cursor: pointer;
+  color: var(--text); /* ← blanc comme demandé */
+  font-weight: 400;
+}
+
+.tab.active {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+/* Room title */
+.room-title {
+  margin-bottom: var(--space);
+  padding: 4px;
+}
+
+.tab-close {
+  margin-left: 5px;
+  font-size: 15px; /* plus grande et plus lisible */
+  cursor: pointer;
+  opacity: 0.75;
+  display: inline-block;
+  transform: translateY(-3px); /* micro alignement vertical */
+}
+
+.tab-close:hover {
+  opacity: 1;
+}
+
+/* ===================== MESSAGES ===================== */
+
+#messages {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: var(--space);
+  border-radius: var(--radius);
+  min-height: 0;
+  overflow-x: hidden;
+}
+
+/* Liens en bleu Lexyo */
+#messages a {
+  color: var(--accent);
+  text-decoration: none;
+}
+#messages a:hover {
+  text-decoration: underline;
+}
+
+/* Bulles de messages compactes */
+.msg {
+  background: var(--bg-item);
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+}
+
+.msg-time {
+  font-size: var(--font-small);
+  color: var(--text-muted);
+}
+
+.msg-user {
+  font-weight: bold;
+}
+
+.msg-body {
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  line-height: 1.4em;
+}
+
+/*.mention {
+  color: var(--accent-text);
+  background: var(--accent);
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-weight: bold;
+}*/
+
+.mention-me {
+  color: #32d74b;
+  font-weight: 700;
+  background: rgba(50, 215, 75, 0.18);
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+/* ===================== INPUT MESSAGE ===================== */
+
+.msg-input {
+  display: flex;
+  gap: var(--space);
+  margin-top: var(--space);
+  align-items: flex-end; /* important pour textarea qui grandit */
+}
+
+/* === MESSAGE TEXTAREA (remplace l'ancien input) === */
+
+.msg-input textarea#message {
+  flex: 1;
+
+  height: 36px;
+  padding: 8px 12px; /* ← centré proprement */
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+
+  font-family: Consolas, monospace !important;
+  font-size: var(--font-main) !important;
+  line-height: 1.35; /* ← naturel = identique visuellement */
+
+  resize: none;
+  overflow-y: hidden;
+  max-height: 200px;
+  box-sizing: border-box;
+}
+
+/* === BOUTON SEND === */
+
+.msg-input button {
+  height: 36px;                /* ✔ même hauteur que l’ancien input et le bouton + */
+  padding: 0 20px;
+  background: var(--accent);
+  color: var(--accent-text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  flex-shrink: 0;              /* ✔ empêche le bouton de s’étirer */
+}
+
+/* ===================== USER LIST ===================== */
+
+.user-item {
+  background: var(--bg-item);
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.user-item:hover {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+/* ===================== RESPONSIVE ===================== */
+
+@media (max-width: 1100px) {
+  .side-right { display: none; }
+}
+
+@media (max-width: 900px) {
+  .side-left { display: none; }
+}
+
+/* ===================== FORM FOCUS STYLES ===================== */
+input,
+select,
+textarea {
+  outline: none;
+  box-shadow: none;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* ===================== SPECIAL MESSAGES ===================== */
+
+/* Action messages (/me) */
+.msg-action {
+  font-style: italic;
+  color: #c9c9c9;
+  opacity: 0.9;
+  margin: 4px 0;
+  padding: 2px 4px;
+  display: block;
+  white-space: pre-wrap;
+}
+
+/* System messages (/help, notifications) */
+.system {
+  color: #8c8c8c;
+  opacity: 0.85;
+  font-size: 13px;
+  padding: 3px 4px;
+  margin: 4px 0;
+  white-space: pre-wrap; /* important pour le multiline */
+}
+
+/* ===================== SCROLLBAR STYLES ===================== */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #444 transparent;
+}
+
+/* ===================== CODE BLOCK (/code) ===================== */
+
+.msg-code {
+  background: #1b1b1b;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  font-family: Consolas, monospace;
+  overflow: visible; /* bloc propre */
+}
+
+.msg-code .msg-line {
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.msg-code .msg-user {
+  font-weight: bold;
+  color: var(--text);
+}
+
+.msg-code .msg-lang {
+  margin-left: 8px;
+  color: var(--accent);
+  font-size: 12px;
+}
+
+/* Bloc de code avec défilement horizontal */
+.msg-code-block {
+  background: #111;
+  padding: 10px;
+  border-radius: var(--radius);
+  border: 1px solid #333;
+  overflow-x: auto;     /* ← important */
+  overflow-y: hidden;
+  max-width: 100%;
+  white-space: pre;     /* ← respecte les retours ligne */
+  box-sizing: border-box;
+}
+
+.msg-code-block code {
+  color: #e0e0e0;
+  font-family: Consolas, monospace;
+  font-size: 13px;
+  display: inline-block;
+  min-width: 100%;
+}
+
+/* ===================== TAB BLINKING ANIMATION ===================== */
+
+.tab.blink {
+  animation: tab-blink 0.7s ease-in-out infinite;
+}
+
+@keyframes tab-blink {
+  0%, 100% {
+    background: var(--bg-item);
+    color: var(--text);
+    border-color: var(--border);
+  }
+  50% {
+    background: var(--accent);
+    color: var(--accent-text);
+    border-color: var(--accent);
+  }
+}
+
+/* ===================== ONLINE/OFFLINE DOTS ===================== */
+
+.chan-dot {
+  font-size: 14px;
+  margin-right: 4px;
+  transition: color 0.2s ease;
+}
+
+.dot-green {
+  color: #32d74b; /* vert apple / discord */
+}
+
+.dot-red {
+  color: #ff453a; /* rouge iOS clean */
+}
+
+/* =====================================================
+   FLEX SAFETY — prevent layout expansion by long content
+===================================================== */
+
+#messages,
+.msg,
+.msg-body,
+.msg-code {
+  min-width: 0;
+}

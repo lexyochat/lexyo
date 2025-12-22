@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Lexyo</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+  <!-- Socket.io -->
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+
+  <!-- Cloudflare Turnstile (Invisible Captcha) -->
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+
+  <!-- Main JS -->
+  <script type="module" src="{{ url_for('static', filename='script.js') }}"></script>
+</head>
+
+<body>
+
+  <!-- ========================= LOGIN SCREEN ========================= -->
+  <div id="login" class="login-screen">
+
+    <h1 class="glow">
+      lexyo<span class="dot">.</span>io
+    </h1>
+
+    <p class="tagline"><em>Speak freely</em></p>
+
+    <div class="login-box">
+
+      <input type="text" id="pseudo" placeholder="Nickname">
+
+      <select id="lang">
+        <option value="en">EN</option>
+        <option value="fr">FR</option>
+        <option value="es">ES</option>
+        <option value="de">DE</option>
+        <option value="it">IT</option>
+        <option value="ja">JA</option>
+        <option value="ru">RU</option>
+      </select>
+
+      <!-- Invisible Cloudflare Turnstile -->
+      <div class="cf-turnstile"
+          data-sitekey="{{ TURNSTILE_SITE_KEY }}"
+          data-callback="onTurnstileSuccess"
+          data-size="invisible">
+      </div>
+
+      <button id="enter">Join</button>
+    </div>
+
+    <div id="error-box" class="error"></div>
+
+  </div> <!-- /login -->
+
+
+
+  <!-- ========================= APPLICATION ========================= -->
+  <div id="app" class="app hidden">
+
+    <div class="app-layout">
+
+      <!-- LEFT -->
+      <aside class="side-left">
+
+        <a href="/" class="brand-box brand-link">
+          <span class="brand-title">Lexyo<span class="dot">.</span>io</span>
+        </a>
+
+        <h3 class="section-title">Channels</h3>
+
+        <ul id="channel-list" class="list-block"></ul>
+
+        <div class="create-room">
+          <input type="text" id="new-room-name" placeholder="New channel">
+          <button id="create-room-btn" class="create-btn">+</button>
+        </div>
+
+      </aside>
+
+      <!-- MAIN -->
+      <main class="chat-center">
+
+        <div id="tabs" class="tabs"></div>
+
+        <h3 id="room-title" class="room-title">#general</h3>
+
+        <div id="messages" class="messages"></div>
+
+        <div class="msg-input">
+          <textarea id="message" placeholder="Write a message..." rows="1" spellcheck="false"></textarea>
+          <button id="send">Send</button>
+        </div>
+
+      </main>
+
+      <!-- RIGHT -->
+      <aside class="side-right">
+        <h3 class="section-title">Users</h3>
+        <ul id="user-list" class="list-block"></ul>
+      </aside>
+
+    </div><!-- /app-layout -->
+
+  </div><!-- /app -->
+
+
+
+  <!-- ========================= FOOTER LEXYO — UNDERGROUND EDITION ========================= -->
+  <div id="footer-donate" class="footer-donate">
+    <span class="line1">No accounts • No logs • No tracking</span><br>
+    <span class="line2">⧉ Kopimi — Made with &lt;3 somewhere on Earth</span><br>
+    <span class="line3">BTC: bc1qvcnwphphr6h543jvzzqc7xkgrrq7rd2eeu4f9m</span>
+  </div>
+
+
+  <!-- Turnstile success callback -->
+  <script>
+    function onTurnstileSuccess(token) {
+      window.turnstileToken = token;
+    }
+  </script>
+
+</body>
+</html>
