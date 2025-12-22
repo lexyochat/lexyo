@@ -1,6 +1,6 @@
 # =========================================
 #     Lexyo — Translation Engine (CLEAN PROD + Logging)
-#     PATCH 10: Immediate persistent cache write
+#     PATCH 12: allow batch translation even if src == tgt
 # =========================================
 
 import os
@@ -48,7 +48,8 @@ def _get_openai_client():
         return None
 
     try:
-        _openai_client = OpenAI(api_key=api_key)
+        # IMPORTANT: project-based keys (sk-proj-*) must NOT be passed explicitly
+        _openai_client = OpenAI()
         log_info("translate", "OpenAI client initialized.")
         return _openai_client
     except Exception:
@@ -166,7 +167,6 @@ def _add_to_cache(key: str, translated: str):
     _write_counter += 1
     _ensure_cache_limit()
 
-    # 🔴 CRITICAL FIX:
     # Persist immediately so cache is not lost between messages
     _save_cache(force=True)
 
@@ -240,8 +240,6 @@ def translate_batch(texts: List[str], src: str, tgt: str) -> List[str]:
 
     if not texts:
         return []
-    if src == tgt:
-        return texts
 
     client = _get_openai_client()
     if not client:
