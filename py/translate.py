@@ -217,7 +217,7 @@ def _translate_via_openai_lru(text: str, src: str, tgt: str) -> str:
 def translate_text(text: str, src: str, tgt: str) -> str:
     """Translate a single message safely (cached, failsafe, no URLs)."""
 
-    if not text or src == tgt or contains_url(text):
+    if not text or contains_url(text):
         return text
 
     key = _make_key(text, src, tgt)
