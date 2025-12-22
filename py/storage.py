@@ -90,7 +90,11 @@ def normalize_message(msg: dict) -> dict:
         m.setdefault("original", m.get("text"))
         m.setdefault("translated", None)
         m.setdefault("lang", None)
-        m.setdefault("source_lang", m.get("lang"))
+        # IMPORTANT:
+        # - source_lang MUST be preserved if provided by the sender
+        # - NEVER derive source_lang from user lang
+        if "source_lang" not in m:
+            m["source_lang"] = None
 
     elif m["type"] in ("action", "code"):
         m.setdefault("content", "")
