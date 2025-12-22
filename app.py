@@ -8,6 +8,7 @@ import eventlet
 eventlet.monkey_patch()
 
 import os
+import requests
 from flask import Flask, render_template
 from flask_socketio import SocketIO
 
@@ -23,6 +24,58 @@ from py.sockets_private import register_private_handlers
 from py.logger import log_info, log_error
 
 # =========================================
+#   TURNSTILE (SERVER VERIFY HELPERS)
+# =========================================
+def verify_turnstile(token: str) -> bool:
+    """
+    Verify a Turnstile token against Cloudflare siteverify endpoint.
+    - One-shot token expected (do not reuse tokens).
+    - No remoteip sent (proxy environments like Render/CDN make remote IP unreliable).
+    """
+    try:
+        secret = os.getenv("TURNSTILE_SECRET_KEY", "").strip()
+        if not secret:
+            log_error("turnstile", "TURNSTILE_SECRET_KEY is missing in environment.")
+            return False
+
+        if not token or not isinstance(token, str):
+            log_info("turnstile", "Missing or invalid token.")
+            return False
+
+        token = token.strip()
+        if not token:
+            log_info("turnstile", "Empty token after strip.")
+            return False
+
+        r = requests.post(
+            "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+            data={
+                "secret": secret,
+                "response": token,
+            },
+            timeout=5,
+        )
+
+        # Robust parsing
+        try:
+            data = r.json()
+        except Exception:
+            log_error("turnstile", f"Non-JSON response from siteverify: {r.text[:500]}")
+            return False
+
+        ok = data.get("success") is True
+        if not ok:
+            # Keep it short but useful; do not log secrets/tokens
+            codes = data.get("error-codes")
+            log_info("turnstile", f"Verification failed. error-codes={codes}")
+        return ok
+
+    except Exception as e:
+        log_error("turnstile", f"Verification exception: {e}")
+        return False
+
+
+# =========================================
 #   FLASK + SOCKET.IO (EVENTLET)
 # =========================================
 app = Flask(__name__)
@@ -31,6 +84,10 @@ socketio = SocketIO(
     async_mode="eventlet",
     cors_allowed_origins="*"
 )
+
+# Expose helpers for other modules (sockets handlers, etc.)
+# This avoids circular imports and keeps a single source of truth.
+app.config["VERIFY_TURNSTILE"] = verify_turnstile
 
 # =========================================
 #   ENSURE DATA DIR EXISTS
