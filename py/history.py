@@ -9,14 +9,14 @@ from flask_socketio import emit
 from py.state import users
 from py.storage import get_room_history, decrypt_mp
 from py.config import HISTORY_LIMIT
-from py.translate import translate_batch
 from py.logger import log_info, log_warning, log_error, log_exception
 
 
 def send_room_history(room, sid):
     """
     Envoie l'historique complet d'un salon (public ou privé) à un user.
-    - Messages "text" → traduits en batch vers la langue de l'utilisateur.
+    - PATCH: AUCUNE traduction batch ici (aucun appel OpenAI pendant join/refresh).
+    - Messages "text" → envoyés bruts (original indicates original; translated=None).
     - Messages "action" (/me) → renvoyés tels quels, sans traduction.
     - Messages "code" (/code) → renvoyés tels quels, sans traduction.
     - MP (@room) → messages stockés chiffrés, déchiffrés côté serveur avant envoi.
@@ -34,7 +34,7 @@ def send_room_history(room, sid):
 
         # ----------------------------------------------------
         # 0) Déchiffrement des MP (si room privée @...)
-        #    IMPORTANT: on le fait AVANT traduction/payload.
+        #    IMPORTANT: on le fait AVANT payload.
         # ----------------------------------------------------
         if isinstance(room, str) and room.startswith("@"):
             for m in room_msgs:
@@ -55,64 +55,11 @@ def send_room_history(room, sid):
         )
 
         # ----------------------------------------------------
-        # 1) Préparation de la traduction batch
-        #    (uniquement pour les messages de type "text")
-        # ----------------------------------------------------
-        translations = [None] * len(room_msgs)
-        grouped = {}  # { src_lang: [(index, text), ...], ... }
-
-        for idx, msg in enumerate(room_msgs):
-            msg_type = msg.get("type", "text")
-
-            # /me et /code → pas de traduction
-            if msg_type in ("action", "code"):
-                continue
-
-            src_lang = msg.get("source_lang")
-            if not src_lang:
-                # Force translation when source language is unknown
-                src_lang = "__unknown__"
-
-            original = msg.get("original", "")
-            grouped.setdefault(src_lang, []).append((idx, original))
-
-        # ----------------------------------------------------
-        # 2) Traductions batch par langue source
-        # ----------------------------------------------------
-        for src_lang, items in grouped.items():
-            texts = [txt for _, txt in items]
-
-            if not texts:
-                continue
-
-            try:
-                translated_list = translate_batch(texts, src_lang, target_lang)
-            except Exception:
-                log_exception(
-                    "history",
-                    f"Batch translation failed from {src_lang} to {target_lang}",
-                )
-                translated_list = texts  # fallback: on garde le texte original
-
-            # Sécurité: même taille
-            if len(translated_list) != len(texts):
-                log_error(
-                    "history",
-                    f"translate_batch size mismatch: got {len(translated_list)} "
-                    f"for {len(texts)} inputs, falling back to originals.",
-                )
-                translated_list = texts
-
-            # On range les traductions dans le tableau aligné sur room_msgs
-            for (idx, _), tr in zip(items, translated_list):
-                translations[idx] = tr
-
-        # ----------------------------------------------------
-        # 3) Construction du payload final
+        # 1) Construction du payload final (SANS traduction)
         # ----------------------------------------------------
         history_payload = []
 
-        for idx, msg in enumerate(room_msgs):
+        for msg in room_msgs:
             msg_type = msg.get("type", "text")
 
             # ---------- /me : action ----------
@@ -142,15 +89,14 @@ def send_room_history(room, sid):
 
             # ---------- Message texte classique ----------
             original = msg.get("original", "")
-            translated = translations[idx] if translations[idx] is not None else original
 
             history_payload.append(
                 {
                     "type": "text",
                     "pseudo": msg.get("pseudo", ""),
-                    "text": translated or original,
+                    "text": original,              # PATCH: affichage immédiat (brut)
                     "original": original,
-                    "translated": translated,
+                    "translated": None,            # PATCH: aucune traduction dans l'historique
                     "source_lang": msg.get("source_lang"),
                     "target_lang": target_lang,
                     "timestamp": msg.get("timestamp"),
@@ -159,7 +105,7 @@ def send_room_history(room, sid):
             )
 
         # ----------------------------------------------------
-        # 4) Envoi au client
+        # 2) Envoi au client
         # ----------------------------------------------------
         emit("room_history", {"room": room, "messages": history_payload}, to=sid)
 

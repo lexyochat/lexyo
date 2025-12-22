@@ -15,14 +15,20 @@ import tempfile
 from cryptography.fernet import Fernet
 
 from py.config import (
-    CHANNELS_FILE, PUBLIC_DIR, PRIVATE_DIR,
-    HISTORY_LIMIT, OFFICIAL_ROOMS, MP_SECRET_KEY
+    CHANNELS_FILE,
+    PUBLIC_DIR,
+    PRIVATE_DIR,
+    HISTORY_LIMIT,
+    OFFICIAL_ROOMS,
+    MP_SECRET_KEY,
 )
 import py.state as state
 from py.logger import log_info, log_warning, log_error, log_exception
 
 
-# Ensure directories exist
+# =====================================================
+#   ENSURE DIRECTORIES EXIST
+# =====================================================
 os.makedirs(PUBLIC_DIR, exist_ok=True)
 os.makedirs(PRIVATE_DIR, exist_ok=True)
 
@@ -30,7 +36,6 @@ os.makedirs(PRIVATE_DIR, exist_ok=True)
 # =====================================================
 #   ATOMIC JSON WRITE (ROBUST PERSISTENCE)
 # =====================================================
-
 def _atomic_write_json(path: str, payload):
     directory = os.path.dirname(path) or "."
     os.makedirs(directory, exist_ok=True)
@@ -53,7 +58,6 @@ def _atomic_write_json(path: str, payload):
 # =====================================================
 #   MP SERVER-SIDE ENCRYPTION HELPERS
 # =====================================================
-
 def _get_mp_cipher():
     if not MP_SECRET_KEY:
         raise RuntimeError("MP_SECRET_KEY is not set")
@@ -77,8 +81,16 @@ def decrypt_mp(token: str) -> str:
 # =====================================================
 #   MESSAGE NORMALIZATION (CONTRACT LOCK)
 # =====================================================
-
 def normalize_message(msg: dict) -> dict:
+    """
+    Normalize a message BEFORE persistence.
+
+    CONTRACT (IMPORTANT):
+    - source_lang MUST be preserved if provided by the sender
+    - source_lang MUST NOT be inferred or replaced
+    - If absent, it stays None (never "__unknown__", never user.lang)
+    This avoids useless / dangerous translation triggers later.
+    """
     m = dict(msg or {})
 
     m.setdefault("type", "text")
@@ -90,9 +102,8 @@ def normalize_message(msg: dict) -> dict:
         m.setdefault("original", m.get("text"))
         m.setdefault("translated", None)
         m.setdefault("lang", None)
-        # IMPORTANT:
-        # - source_lang MUST be preserved if provided by the sender
-        # - NEVER derive source_lang from user lang
+
+        # 🔒 HARD RULE: preserve source_lang as-is
         if "source_lang" not in m:
             m["source_lang"] = None
 
@@ -105,7 +116,6 @@ def normalize_message(msg: dict) -> dict:
 # =====================================================
 #   DEBOUNCE SAVE (CHANNELS)
 # =====================================================
-
 _last_save_request = 0
 _save_scheduled = False
 _DEBOUNCE_DELAY = 1.0
@@ -137,7 +147,6 @@ def schedule_save_channels():
 # =====================================================
 #   LOAD CHANNELS
 # =====================================================
-
 def load_channels():
     try:
         with open(CHANNELS_FILE, "r", encoding="utf-8") as f:
@@ -159,7 +168,8 @@ def load_channels():
             }
 
         state.rooms[:] = [
-            r for r in state.rooms_meta.keys() if not r.startswith("@")
+            r for r in state.rooms_meta.keys()
+            if not r.startswith("@")
         ]
 
         log_info("storage", f"Loaded {len(state.rooms)} channels.")
@@ -192,7 +202,6 @@ def load_channels():
 # =====================================================
 #   SAVE CHANNELS
 # =====================================================
-
 def save_channels():
     now = time.time()
 
@@ -207,6 +216,7 @@ def save_channels():
         if r not in state.rooms:
             state.rooms.append(r)
 
+    # Never persist MP rooms
     state.rooms[:] = [
         r for r in state.rooms
         if not (isinstance(r, str) and r.startswith("@"))
@@ -228,7 +238,6 @@ def save_channels():
 # =====================================================
 #   MESSAGE HISTORY
 # =====================================================
-
 def get_room_path(room):
     if room.startswith("@"):
         return os.path.join(PRIVATE_DIR, f"{room}.json")
@@ -261,7 +270,6 @@ def load_room_messages(room):
 
 def save_room_messages(room, msgs):
     path = get_room_path(room)
-
     try:
         _atomic_write_json(path, msgs)
     except Exception:
@@ -272,6 +280,7 @@ def append_message(room, msg):
     msgs = load_room_messages(room)
     msg = normalize_message(msg)
 
+    # MP encryption
     if isinstance(room, str) and room.startswith("@"):
         msg = msg.copy()
         msg_type = msg.get("type", "text")

@@ -1,6 +1,6 @@
 # =========================================
 #     Lexyo — Translation Engine (CLEAN PROD + Logging)
-#     PATCH 12: allow batch translation even if src == tgt
+#     PATCH 13: restore guards (no OpenAI if src==tgt / missing)
 # =========================================
 
 import os
@@ -240,6 +240,10 @@ def translate_text(text: str, src: str, tgt: str) -> str:
     if not text or contains_url(text):
         return text
 
+    # PATCH: hard guards (no useless/slow OpenAI calls)
+    if not src or not tgt or src == tgt:
+        return text
+
     key = _make_key(text, src, tgt)
     entry = TRANSLATION_CACHE.get(key)
 
@@ -260,6 +264,10 @@ def translate_batch(texts: List[str], src: str, tgt: str) -> List[str]:
 
     if not texts:
         return []
+
+    # PATCH: hard guards (no batch OpenAI for same-lang / missing lang)
+    if not src or not tgt or src == tgt:
+        return texts
 
     client = _get_openai_client()
     if not client:
