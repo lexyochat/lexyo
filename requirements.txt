@@ -23,6 +23,8 @@ requests==2.31.0
 
 # OpenAI API
 openai==1.43.0
+numpy==1.26.4
+pandas==2.2.3
 
 # Optional: Faster JSON (safe + tiny)
 orjson==3.9.15
