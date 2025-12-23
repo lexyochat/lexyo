@@ -1,12 +1,14 @@
 // =====================================================
-//   TURNSTILE.JS — Lexyo Clean Module (PATCHED)
-//   Cloudflare Turnstile (Invisible, Explicit Render)
-//   Stable with ES modules, no race condition
+//   TURNSTILE.JS — Lexyo Clean Module (STABLE PROD FIX)
+//   Cloudflare Turnstile Invisible — RACE CONDITION FIX
 // =====================================================
 
 let resolvers = [];
 let timer = null;
 let widgetId = null;
+
+// 🔒 Stocke le dernier token reçu (évite race condition)
+let lastToken = null;
 
 // -----------------------------------------------------
 // Global callback required by Cloudflare Turnstile
@@ -14,6 +16,9 @@ let widgetId = null;
 if (!window.onTurnstileSuccess) {
   window.onTurnstileSuccess = function (token) {
     if (!token) return;
+
+    // Stocker le token au cas où runTurnstile n'écoute pas encore
+    lastToken = token;
 
     const list = resolvers.slice();
     resolvers = [];
@@ -55,7 +60,6 @@ function executeTurnstile() {
   if (!window.turnstile) return;
 
   ensureWidget();
-
   if (widgetId === null) return;
 
   try {
@@ -69,6 +73,20 @@ function executeTurnstile() {
 // -----------------------------------------------------
 export function runTurnstile() {
   return new Promise((resolve, reject) => {
+
+    // ✅ Si un token est déjà disponible, on le consomme immédiatement
+    if (lastToken) {
+      const token = lastToken;
+      lastToken = null;
+      resolve(token);
+      return;
+    }
+
+    if (!window.turnstile) {
+      reject("turnstile_not_loaded");
+      return;
+    }
+
     resolvers.push(resolve);
 
     timer = setTimeout(() => {
