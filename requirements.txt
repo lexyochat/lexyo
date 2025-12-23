@@ -21,8 +21,9 @@ python-dotenv==1.0.1
 # HTTP utils (Turnstile check + misc)
 requests==2.31.0
 
-# OpenAI - New API (v1.x)
+# OpenAI API
 openai==1.35.14
+numpy==1.26.4
 
 # Optional: Faster JSON (safe + tiny)
 orjson==3.9.15
