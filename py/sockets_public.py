@@ -322,7 +322,7 @@ def register_public_handlers(socketio):
     # -----------------------------------------
     # CONNECT
     # -----------------------------------------
-    @socketio.on("connect")
+    @socketio.on("connect", namespace="/")
     def on_connect():
         from py.state import rooms
         emit("channel_list", {"channels": rooms})
@@ -331,7 +331,7 @@ def register_public_handlers(socketio):
     # -----------------------------------------
     # REGISTER + CAPTCHA
     # -----------------------------------------
-    @socketio.on("register")
+    @socketio.on("register", namespace="/")
     def register(data):
         from py.state import rooms, rooms_meta
 
@@ -444,7 +444,7 @@ def register_public_handlers(socketio):
     # -----------------------------------------
     # DISCONNECT
     # -----------------------------------------
-    @socketio.on("disconnect")
+    @socketio.on("disconnect", namespace="/")
     def disconnect():
         user = users.get(request.sid)
         if not user:
@@ -477,7 +477,7 @@ def register_public_handlers(socketio):
     # -----------------------------------------
     # JOIN ROOM
     # -----------------------------------------
-    @socketio.on("join")
+    @socketio.on("join", namespace="/")
     def join_room_handler(data):
         from py.state import rooms, rooms_meta
 
@@ -558,7 +558,7 @@ def register_public_handlers(socketio):
     # -----------------------------------------
     # CREATE ROOM (PATCH VALIDATION + RETOURS PROPRES)
     # -----------------------------------------
-    @socketio.on("create_room")
+    @socketio.on("create_room", namespace="/")
     def create_room_handler(data):
         from py.state import rooms, rooms_meta
         from py.rooms import is_valid_room_name
@@ -650,7 +650,7 @@ def register_public_handlers(socketio):
     # -----------------------------------------
     # SEND MESSAGE
     # -----------------------------------------
-    @socketio.on("send_message")
+    @socketio.on("send_message", namespace="/")
     def handle_message(data):
         user = users.get(request.sid)
         if not user:
