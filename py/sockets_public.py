@@ -67,7 +67,7 @@ def _rate_limit_check(user_id: str, ip: str) -> bool:
 # =====================================================
 #   TURNSTILE CAPTCHA VALIDATION
 # =====================================================
-def verify_turnstile(token, remote_ip):
+def verify_turnstile(token):
     if not TURNSTILE_SECRET_KEY:
         # In production, Turnstile MUST be enforced.
         if REQUIRE_TURNSTILE:
@@ -80,7 +80,6 @@ def verify_turnstile(token, remote_ip):
     data = {
         "secret": TURNSTILE_SECRET_KEY,
         "response": token,
-        "remoteip": remote_ip,
     }
 
     try:
@@ -324,8 +323,7 @@ def register_public_handlers(socketio):
             return
 
         # CAPTCHA
-        remote_ip = request.remote_addr or ""
-        if not verify_turnstile(captcha_token, remote_ip):
+        if not verify_turnstile(captcha_token):
             emit("pseudo_taken", {"msg": "Captcha failed. Try again."})
             return
 
