@@ -1,30 +1,23 @@
 # ============================================
 #   Lexyo — Central logger (CLEAN PROD)
-#   PATCH 01: Persist logs to DATA_DIR/_logs (Render disk)
 # ============================================
 
 import logging
-import os
-import sys
 from logging.handlers import TimedRotatingFileHandler
 
-from py.config import LOGS_DIR
+from py.config import LOG_DIR, LOG_FILE
 
-# Ensure persistent logs directory exists
-os.makedirs(LOGS_DIR, exist_ok=True)
+# Ensure log directory exists (defensive; config.py already does it)
+try:
+    import os
+    os.makedirs(LOG_DIR, exist_ok=True)
+except Exception:
+    pass
+
 
 # --------------------------------------------
 #   Logger identity (overrideable by env)
 # --------------------------------------------
-# - If LEXYO_LOG_FILE is absolute, keep it as-is.
-# - If it is relative, store it under LOGS_DIR.
-DEFAULT_LOG_FILE = os.path.join(LOGS_DIR, "lexyo.log")
-_env_log_file = os.getenv("LEXYO_LOG_FILE", "").strip()
-
-if _env_log_file:
-    LOG_FILE = _env_log_file if os.path.isabs(_env_log_file) else os.path.join(LOGS_DIR, _env_log_file)
-else:
-    LOG_FILE = DEFAULT_LOG_FILE
 
 # Global app logger name
 ROOT_LOGGER_NAME = os.getenv("LEXYO_LOGGER_NAME", "lexyo")
@@ -37,39 +30,27 @@ def _configure_root_logger() -> logging.Logger:
     """
     Configure the root Lexyo logger once (idempotent).
     Uses a daily rotating file, keeps 30 days of history.
-
-    PATCH 01:
-    - File logs are written under LOGS_DIR (persistent disk).
-    - If file handler fails, fall back to stderr to avoid crashing the app.
     """
     logger = logging.getLogger(ROOT_LOGGER_NAME)
 
+    # Prevent duplicate handlers on hot reload / multiple imports
     if logger.handlers:
-        # Already configured (avoid duplicate handlers on reload)
         return logger
 
     logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+
+    handler = TimedRotatingFileHandler(
+        LOG_FILE,
+        when="midnight",
+        backupCount=30,
+        encoding="utf-8",
+        utc=False,
+    )
 
     formatter = logging.Formatter(
         "%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-
-    try:
-        # Ensure directory exists even if LOG_FILE points elsewhere inside LOGS_DIR
-        os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
-
-        handler = TimedRotatingFileHandler(
-            LOG_FILE,
-            when="midnight",
-            backupCount=30,
-            encoding="utf-8",
-            utc=False,
-        )
-    except Exception:
-        # Safe fallback: still log somewhere, but do not crash server
-        handler = logging.StreamHandler(stream=sys.stderr)
-
     handler.setFormatter(formatter)
 
     logger.addHandler(handler)

@@ -10,59 +10,52 @@ import os
 # =========================================
 # Expected values: "dev", "prod"
 ENV = os.getenv("ENV", "dev").lower()
+
 IS_PROD = ENV == "prod"
 
 # =========================================
-#   RENDER / PERSISTENT DISK
+#   PATHS — SINGLE SOURCE OF TRUTH (PERSISTENCE)
 # =========================================
-# On Render, attach a disk mounted for example at:
-#   /var/data
+# Render filesystem is ephemeral. All persistent writes MUST go to a durable mount.
+# In production on Render, Persistent Disk is mounted at: /var/data
 #
-# We make DATA_DIR resolve to the disk when available,
-# so conversations/files survive restarts & deploys.
+# Override options:
+#   - LEXYO_PERSIST_ROOT=/custom/path
+#   - LEXYO_DATA_DIR=/custom/path   (legacy alias for persist root)
 #
-# Priority:
-#  1) DATA_DIR env (absolute or relative)
-#  2) RENDER_DISK_MOUNT env (absolute)
-#  3) If /var/data exists -> use it
-#  4) fallback to ./data (local)
+# In dev, we default to a local folder inside the repo: ./var/data
 
-def _resolve_data_dir() -> str:
-    env_data_dir = os.getenv("DATA_DIR", "").strip()
-    if env_data_dir:
-        if os.path.isabs(env_data_dir):
-            return env_data_dir
-        return os.path.abspath(env_data_dir)
+# Project root = one level above /py
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-    env_mount = os.getenv("RENDER_DISK_MOUNT", "").strip()
-    if env_mount and os.path.isabs(env_mount):
-        return env_mount
+PERSIST_ROOT = (
+    os.getenv("LEXYO_PERSIST_ROOT")
+    or os.getenv("LEXYO_DATA_DIR")
+    or ("/var/data" if IS_PROD else os.path.join(PROJECT_ROOT, "var", "data"))
+)
 
-    if os.path.isdir("/var/data"):
-        return "/var/data"
+# Keep legacy variable names for backward compatibility across the codebase:
+DATA_DIR = PERSIST_ROOT
 
-    return os.path.abspath("data")
+# Core persistence files/folders
+CHANNELS_FILE = os.path.join(PERSIST_ROOT, "channels.json")
+PUBLIC_DIR = os.path.join(PERSIST_ROOT, "public")
+PRIVATE_DIR = os.path.join(PERSIST_ROOT, "private")
 
+# Cache persistence (translations, etc.)
+CACHE_DIR = os.path.join(PERSIST_ROOT, "cache")
+CACHE_FILE = os.path.join(CACHE_DIR, "translations.json")
 
-DATA_DIR = _resolve_data_dir()
-
-# =========================================
-#   STORAGE DIRECTORIES
-# =========================================
-CHANNELS_FILE = os.path.join(DATA_DIR, "channels.json")
-PUBLIC_DIR = os.path.join(DATA_DIR, "public")
-PRIVATE_DIR = os.path.join(DATA_DIR, "private")
-
-CACHE_DIR = os.path.join(DATA_DIR, "_cache")
-TRANSLATIONS_CACHE_FILE = os.path.join(CACHE_DIR, "translations.json")
-
-LOGS_DIR = os.path.join(DATA_DIR, "_logs")
+# Logs persistence
+LOG_DIR = os.path.join(PERSIST_ROOT, "logs")
+DEFAULT_LOG_FILE = os.path.join(LOG_DIR, "lexyo.log")
+LOG_FILE = os.getenv("LEXYO_LOG_FILE", DEFAULT_LOG_FILE)
 
 # Ensure folders exist at startup
 os.makedirs(PUBLIC_DIR, exist_ok=True)
 os.makedirs(PRIVATE_DIR, exist_ok=True)
 os.makedirs(CACHE_DIR, exist_ok=True)
-os.makedirs(LOGS_DIR, exist_ok=True)
+os.makedirs(LOG_DIR, exist_ok=True)
 
 # =========================================
 #   GENERAL PARAMETERS

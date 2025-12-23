@@ -325,14 +325,9 @@ def register_public_handlers(socketio):
 
         # CAPTCHA
         remote_ip = request.remote_addr or ""
-        if REQUIRE_TURNSTILE:
-            if not captcha_token:
-                emit("pseudo_taken", {"msg": "Captcha not ready. Please try again."})
-                return
-
-            if not verify_turnstile(captcha_token, remote_ip):
-                emit("pseudo_taken", {"msg": "Captcha failed. Please try again."})
-                return
+        if not verify_turnstile(captcha_token, remote_ip):
+            emit("pseudo_taken", {"msg": "Captcha failed. Try again."})
+            return
 
         # BAN CHECK
         ban_exp = banned_until.get(user_id)

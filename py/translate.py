@@ -1,7 +1,6 @@
-# =========================================
+# ============================================
 #     Lexyo — Translation Engine (CLEAN PROD + Logging)
-#     PATCH 13: restore guards (no OpenAI if src==tgt / missing)
-# =========================================
+# ============================================
 
 import os
 import re
@@ -13,8 +12,8 @@ from functools import lru_cache
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from py.config import CACHE_DIR, CACHE_FILE
 from py.logger import log_info, log_warning, log_error, log_exception
-from py.config import CACHE_DIR, TRANSLATIONS_CACHE_FILE
 
 # =========================================
 #   OPENAI CONFIG (SAFE / LAZY)
@@ -25,6 +24,7 @@ _openai_disabled = False
 MODEL_NAME = "gpt-4o-mini"
 
 # LRU in-memory cache (S5-B)
+# This complements the disk cache (translations.json).
 LRU_MAXSIZE = 5000
 
 
@@ -48,8 +48,7 @@ def _get_openai_client():
         return None
 
     try:
-        # IMPORTANT: project-based keys (sk-proj-*) must NOT be passed explicitly
-        _openai_client = OpenAI()
+        _openai_client = OpenAI(api_key=api_key)
         log_info("translate", "OpenAI client initialized.")
         return _openai_client
     except Exception:
@@ -61,35 +60,16 @@ def _get_openai_client():
 # =========================================
 #   CACHE CONFIG (PERSISTENT)
 # =========================================
-os.makedirs(CACHE_DIR, exist_ok=True)
-CACHE_FILE = TRANSLATIONS_CACHE_FILE
 
 MAX_CACHE_SIZE = 50000
 TRIM_TARGET_RATIO = 0.9
-SAVE_EVERY_N_WRITES = 50  # kept for compatibility / future tuning
+SAVE_EVERY_N_WRITES = 50
+
+os.makedirs(CACHE_DIR, exist_ok=True)
 
 TRANSLATION_CACHE: Dict[str, Dict] = {}
 _write_counter = 0
 URL_REGEX = re.compile(r"https?://\S+", re.IGNORECASE)
-
-_QUOTE_EXTRACT_REGEX = re.compile(r"'([^']+)'|\"([^\"]+)\"")
-
-
-def _extract_translation_only(text: str) -> str:
-    """
-    Best-effort cleanup when the model returns an explanation instead of only the translation.
-    Example: "'Hello world' in French is 'Bonjour le monde'."
-    We try to return the last quoted segment.
-    """
-    if not text:
-        return text
-    s = str(text).strip()
-    matches = _QUOTE_EXTRACT_REGEX.findall(s)
-    if matches:
-        last = matches[-1]
-        candidate = last[0] or last[1]
-        return candidate.strip() if candidate else s
-    return s
 
 
 # =========================================
@@ -117,7 +97,10 @@ def _load_cache():
         with open(CACHE_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
             TRANSLATION_CACHE = data if isinstance(data, dict) else {}
-        log_info("translate", f"Loaded translation cache ({len(TRANSLATION_CACHE)} entries).")
+        log_info(
+            "translate",
+            f"Loaded translation cache ({len(TRANSLATION_CACHE)} entries)."
+        )
     except Exception:
         TRANSLATION_CACHE = {}
         log_error("translate", "Failed to load translation cache.")
@@ -168,10 +151,6 @@ def _ensure_cache_limit():
 
 
 def _add_to_cache(key: str, translated: str):
-    """
-    Add entry to cache AND persist immediately.
-    This guarantees translation survives refresh / restart.
-    """
     global _write_counter
 
     now = time.time()
@@ -185,12 +164,10 @@ def _add_to_cache(key: str, translated: str):
 
     _write_counter += 1
     _ensure_cache_limit()
-
-    # Persist immediately so cache is not lost between messages
-    _save_cache(force=True)
+    _save_cache()
 
 
-# Load cache on startup
+# Load persistent cache on startup
 _load_cache()
 
 
@@ -198,7 +175,10 @@ _load_cache()
 #   LRU HELPERS (S5-B)
 # =========================================
 def _build_prompt_single(text: str, src: str, tgt: str) -> str:
-    return f"Translate this message from {src} to {tgt}:\n{text}"
+    return (
+        f"Translate this message from {src} to {tgt}.\n"
+        f"Respond ONLY with the translated text, nothing else:\n\n{text}"
+    )
 
 
 @lru_cache(maxsize=LRU_MAXSIZE)
@@ -216,18 +196,20 @@ def _translate_via_openai_lru(text: str, src: str, tgt: str) -> str:
     try:
         resp = client.chat.completions.create(
             model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content": "You are a translation engine. Output ONLY the translated text. No quotes. No explanations."},
-                {"role": "user", "content": prompt},
-            ],
+            messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
         )
-        translated_raw = (resp.choices[0].message.content or "").strip()
-        translated = _extract_translation_only(translated_raw) or text
-        log_info("translate", f"Translated: '{text[:30]}' → '{translated[:30]}'")
+        translated = (resp.choices[0].message.content or "").strip() or text
+        log_info(
+            "translate",
+            f"Translated: '{text[:30]}' → '{translated[:30]}'"
+        )
         return translated
     except Exception:
-        log_exception("translate", f"Translation API failed for '{text[:30]}'")
+        log_exception(
+            "translate",
+            f"Translation API failed for '{text[:30]}'"
+        )
         return text
 
 
@@ -237,11 +219,7 @@ def _translate_via_openai_lru(text: str, src: str, tgt: str) -> str:
 def translate_text(text: str, src: str, tgt: str) -> str:
     """Translate a single message safely (cached, failsafe, no URLs)."""
 
-    if not text or contains_url(text):
-        return text
-
-    # PATCH: hard guards (no useless/slow OpenAI calls)
-    if not src or not tgt or src == tgt:
+    if not text or src == tgt or contains_url(text):
         return text
 
     key = _make_key(text, src, tgt)
@@ -264,9 +242,7 @@ def translate_batch(texts: List[str], src: str, tgt: str) -> List[str]:
 
     if not texts:
         return []
-
-    # PATCH: hard guards (no batch OpenAI for same-lang / missing lang)
-    if not src or not tgt or src == tgt:
+    if src == tgt:
         return texts
 
     client = _get_openai_client()
@@ -297,47 +273,38 @@ def translate_batch(texts: List[str], src: str, tgt: str) -> List[str]:
 
     prompt = (
         f"Translate ALL the following texts from {src} to {tgt}.\n"
-        f"Return ONLY a JSON array (list) of translated strings. No markdown, no explanations.\n\n"
+        f"Return ONLY a JSON list of translated strings.\n\n"
         f"{json.dumps(to_translate, ensure_ascii=False)}"
     )
 
     try:
         resp = client.chat.completions.create(
             model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content": "You are a translation engine. Output ONLY valid JSON array of strings. No markdown. No explanations."},
-                {"role": "user", "content": prompt},
-            ],
+            messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
         )
 
         raw = (resp.choices[0].message.content or "").strip()
-
-        # Try strict JSON first, then attempt to extract the first JSON array if the model wrapped it.
-        try:
-            batch = json.loads(raw)
-        except Exception:
-            start = raw.find("[")
-            end = raw.rfind("]")
-            if start != -1 and end != -1 and end > start:
-                batch = json.loads(raw[start:end + 1])
-            else:
-                raise
+        batch = json.loads(raw)
 
         if not isinstance(batch, list) or len(batch) != len(to_translate):
             raise ValueError("Invalid batch response")
 
         for idx, original, translated in zip(to_indices, to_translate, batch):
-            translated = _extract_translation_only(str(translated or "")) or original
+            translated = translated or original
             results[idx] = translated
             _add_to_cache(_make_key(original, src, tgt), translated)
 
         log_info("translate", f"Batch translated {len(to_translate)} messages.")
 
     except Exception:
-        log_exception("translate", "Batch translation failed — falling back to single requests.")
+        log_exception(
+            "translate",
+            "Batch translation failed — falling back to single requests."
+        )
 
         for idx, original in zip(to_indices, to_translate):
             results[idx] = translate_text(original, src, tgt)
 
+    _save_cache(force=True)
     return [r if r is not None else texts[i] for i, r in enumerate(results)]
