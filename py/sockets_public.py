@@ -65,7 +65,9 @@ def _rate_limit_check(user_id: str, ip: str) -> bool:
 
 
 # =====================================================
-#   TURNSTILE CAPTCHA VALIDATION
+#   TURNSTILE CAPTCHA VALIDATION (PATCHED)
+#   - remoteip REMOVED (proxy-safe)
+#   - explicit missing-token handling (better logs)
 # =====================================================
 def verify_turnstile(token):
     if not TURNSTILE_SECRET_KEY:
@@ -76,10 +78,15 @@ def verify_turnstile(token):
         log_warning("captcha", "TURNSTILE_SECRET_KEY missing — bypassing captcha (dev mode).")
         return True
 
+    if not token:
+        log_warning("captcha", "Turnstile token missing.")
+        return False
+
     url = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
     data = {
         "secret": TURNSTILE_SECRET_KEY,
         "response": token,
+        # IMPORTANT: do NOT send remoteip behind proxies (Render/Cloudflare/etc.)
     }
 
     try:
@@ -315,7 +322,15 @@ def register_public_handlers(socketio):
         pseudo = (data.get("pseudo") or "").strip()
         lang = data.get("lang", "en")
         user_id = data.get("user_id") or request.sid
-        captcha_token = data.get("captcha_token")
+
+        # PATCH: accept several token field names (front may have changed)
+        captcha_token = (
+            data.get("captcha_token")
+            or data.get("cf-turnstile-response")
+            or data.get("cf_turnstile_response")
+            or data.get("turnstile_token")
+            or data.get("token")
+        )
 
         # GLOBAL RATE LIMIT (S3-B)
         if _rate_limit_check(str(user_id), request.remote_addr or ""):
@@ -422,10 +437,6 @@ def register_public_handlers(socketio):
         pseudo = user["pseudo"]
         room = user["room"]
         user_id = str(user.get("user_id") or request.sid)
-
-        # -------------------------------------------------
-        # MP CLEANUP — deterministic (after user removal)
-        # -------------------------------------------------
 
         # -------------------------------------------------
         # Normal disconnect flow (unchanged)
