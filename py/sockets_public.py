@@ -70,6 +70,9 @@ def _rate_limit_check(user_id: str, ip: str) -> bool:
 #   - explicit missing-token handling (better logs)
 # =====================================================
 def verify_turnstile(token):
+    # Normalize token defensively (prod can sometimes send non-str or whitespace)
+    token = str(token or "").strip()
+
     if not TURNSTILE_SECRET_KEY:
         # In production, Turnstile MUST be enforced.
         if REQUIRE_TURNSTILE:
@@ -90,11 +93,24 @@ def verify_turnstile(token):
     }
 
     try:
-        r = requests.post(url, data=data, timeout=5)
-        resp = r.json()
-        if not resp.get("success", False):
-            log_warning("captcha", f"Turnstile failed: {resp}")
-        return resp.get("success", False)
+        r = requests.post(url, data=data, timeout=8)
+
+        if r.status_code != 200:
+            log_warning("captcha", f"Turnstile HTTP {r.status_code}: {r.text[:300]}")
+            return False
+
+        try:
+            resp = r.json()
+        except Exception:
+            log_warning("captcha", f"Turnstile non-JSON response: {r.text[:300]}")
+            return False
+
+        ok = bool(resp.get("success", False))
+        if not ok:
+            codes = resp.get("error-codes") or resp.get("error_codes") or []
+            log_warning("captcha", f"Turnstile failed: codes={codes} full={resp}")
+
+        return ok
 
     except Exception as e:
         log_exception("captcha", f"Turnstile verify error: {e}")
